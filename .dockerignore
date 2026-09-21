@@ -1,0 +1,21 @@
+# Ignorar dependências locais
+node_modules/
+docs/
+
+# Ignorar arquivos de ambiente locais 
+.env
+.env.*
+!.env.example
+
+# Ignorar arquivos de log e git
+npm-debug.log
+yarn-error.log
+.git/
+.gitignore
+
+# Ignorar pastas de sistema/IDE
+.agents/
+.gemini/
+.vscode/
+
+*.md

@@ -1,0 +1,297 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("SUPABASE_DATABASE_URL")
+  directUrl = env("SUPABASE_DIRECT_URL")
+}
+
+enum UserRole {
+  PROFESSOR
+  TI
+  COORDENACAO
+  SECRETARIA
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+}
+
+enum AccessSchedule {
+  FULL
+  BUSINESS_HOURS
+  WEEKDAYS
+}
+
+enum PostStatus {
+  DRAFT
+  PENDING_REVIEW
+  PUBLISHED
+  RETURNED
+  ARCHIVED
+}
+
+model User {
+  id              String         @id @default(uuid())
+  firstName       String?
+  lastName        String?
+  email           String         @unique
+  password        String
+  role            UserRole?      @default(PROFESSOR)
+  status          UserStatus     @default(ACTIVE)
+  accessSchedule  AccessSchedule @default(FULL)
+  imageUrl        String?
+  emailVerifiedAt DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  posts          Post[]           @relation("PostAuthor")
+  reviewedPosts  Post[]           @relation("PostReviewer")
+  permissions    UserPermission[]
+  sentNotifs     Notification[]   @relation("SentNotifications")
+  receivedNotifs Notification[]   @relation("ReceivedNotifications")
+  notificationReads NotificationRead[]
+  auditLogs      AuditLog[]
+  submissionHistories ContactSubmissionHistory[]
+
+  coordinatorId  String?
+  coordinator    User?            @relation("CoordinatorToProfessor", fields: [coordinatorId], references: [id])
+  subordinates   User[]           @relation("CoordinatorToProfessor")
+
+  @@map("users")
+}
+
+model UserPermission {
+  id        String @id @default(uuid())
+  userId    String
+  moduleKey String // agenda, posts, banners, tags, users, notifications, logs
+  level     String // full, view, none
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, moduleKey])
+  @@map("user_permissions")
+}
+
+model Post {
+  id           String     @id @default(uuid())
+  title        String
+  content      String
+  slug         String     @unique
+  excerpt      String?
+  coverImageId String?
+  isEvent      Boolean?   @default(false)
+  status       PostStatus @default(DRAFT)
+  authorId     String
+  author       User       @relation("PostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  published    Boolean    @default(false)
+  
+  reviewNotes  String?
+  reviewedById String?
+  reviewedBy   User?      @relation("PostReviewer", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
+
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  publishedAt  DateTime?
+
+  tags PostTag[]
+
+  @@map("posts")
+}
+
+model Notification {
+  id             String    @id @default(uuid())
+  title          String
+  message        String
+  type           String    @default("INFO") // INFO, WARNING, SUCCESS, DANGER
+  targetUserId   String?
+  targetUser     User?     @relation("ReceivedNotifications", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetRole     String?   // PROFESSOR, COORDENACAO, SECRETARIA, ADMIN, TI
+  isGlobal       Boolean   @default(false)
+  senderId       String?
+  sender         User?     @relation("SentNotifications", fields: [senderId], references: [id], onDelete: SetNull)
+  isRead         Boolean   @default(false)
+  actionUrl      String?
+  attachmentUrl  String?
+  attachmentType String?   // IMAGE, PDF, DOC, LINK
+  createdAt      DateTime  @default(now())
+
+  reads NotificationRead[]
+
+  @@map("notifications")
+}
+
+model NotificationRead {
+  id             String       @id @default(uuid())
+  notificationId String
+  userId         String
+  createdAt      DateTime     @default(now())
+
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([notificationId, userId])
+  @@map("notification_reads")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String   // LOGIN, CREATE_POST, APPROVE_POST, RETURN_POST, UPDATE_PERMISSIONS, etc.
+  module    String   // AUTH, POSTS, BANNERS, AGENDA, USERS, NOTIFICATIONS
+  details   String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}
+
+model SchoolMaterial {
+  id           String   @id @default(uuid())
+  title        String
+  academicYear Int
+  segment      String   // EDUCACAO_INFANTIL, FUNDAMENTAL_1, FUNDAMENTAL_2, ENSINO_MEDIO
+  grade        String   // Ex: "1º Ano", "Maternal II", "3ª Série EM"
+  fileUrl      String
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("school_materials")
+}
+
+model Banner {
+  id          String    @id @default(uuid())
+  title       String
+  imageUrl    String
+  targetUrl   String?
+  publishDate DateTime?
+  order       Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("banners")
+}
+
+model BannerTemplate {
+  id          String    @id @default(uuid())
+  name        String
+  imageUrl    String
+  targetUrl   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("banner_templates")
+}
+
+enum EventType {
+  ACADEMICO
+  ESPORTIVO
+  REUNIAO
+  EVENTO
+  FERIADO
+}
+
+enum EventStatus {
+  CONFIRMADO
+  PENDENTE
+  CANCELADO
+}
+
+model AgendaEvent {
+  id          String      @id @default(uuid())
+  title       String
+  date        DateTime
+  time        String?
+  type        EventType   @default(EVENTO)
+  status      EventStatus @default(CONFIRMADO)
+  location    String?
+  description String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("agenda_events")
+}
+
+model Tag {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  slug      String   @unique
+  color     String?  @default("#44abff")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  posts PostTag[]
+
+  @@map("tags")
+}
+
+model PostTag {
+  postId String
+  tagId  String
+  post   Post   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([postId, tagId])
+  @@map("post_tags")
+}
+
+enum SubmissionType {
+  CONTACT
+  CAREERS
+  ADMISSIONS
+}
+
+enum SubmissionStatus {
+  PENDING
+  REVIEWED
+  CONTACTED
+  ARCHIVED
+}
+
+model ContactSubmission {
+  id                String                     @id @default(uuid())
+  type              SubmissionType             @default(CONTACT)
+  name              String
+  email             String
+  phone             String
+  subject           String?
+  message           String?
+  attachmentUrl     String?
+  extraData         String?
+  status            SubmissionStatus           @default(PENDING)
+  notes             String?
+  lastHandledById   String?
+  lastHandledByName String?
+  lastHandledByRole String?
+  lastHandledAt     DateTime?
+  createdAt         DateTime                   @default(now())
+  updatedAt         DateTime                   @updatedAt
+
+  history           ContactSubmissionHistory[]
+
+  @@map("contact_submissions")
+}
+
+model ContactSubmissionHistory {
+  id           String            @id @default(uuid())
+  submissionId String
+  submission   ContactSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  status       SubmissionStatus
+  note         String?
+  userId       String?
+  user         User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userName     String?
+  userRole     String?
+  createdAt    DateTime          @default(now())
+
+  @@map("contact_submission_histories")
+}
+

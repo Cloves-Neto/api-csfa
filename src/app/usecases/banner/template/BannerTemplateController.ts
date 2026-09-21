@@ -35,7 +35,7 @@ export default class BannerTemplateController {
     public async delete(req: Request, res: Response) {
         try {
             const { id } = req.params;
-            await this.prisma.bannerTemplate.delete({ where: { id } });
+            await this.prisma.bannerTemplate.delete({ where: { id: id as string } });
             return res.status(200).json({ message: "Template excluído com sucesso." });
         } catch (e: any) {
             return res.status(500).json({ message: e.message || "Erro ao excluir template." });

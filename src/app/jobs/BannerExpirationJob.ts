@@ -1,6 +1,6 @@
 import cron from "node-cron";
-import PrismaSinglentonConnection from "../../../infrastructure/database/prisma/prismaSinglentonConnecion";
-import { AuditLogService } from "../../services/AuditLogService";
+import PrismaSinglentonConnection from "../../infrastructure/database/prisma/prismaSinglentonConnecion";
+import { AuditLogService } from "../services/AuditLogService";
 
 export class BannerExpirationJob {
   static start() {
@@ -11,20 +11,22 @@ export class BannerExpirationJob {
 
       try {
         const now = new Date();
+        const limitDate = new Date();
+        limitDate.setDate(limitDate.getDate() - 30);
 
-        // Busca banners ativos cuja data de expiração já passou
+        // Busca banners ativos criados há mais de 30 dias
         const expiredBanners = await prisma.banner.findMany({
           where: {
             isActive: true,
-            endDate: {
-              lt: now, // less than now
+            createdAt: {
+              lt: limitDate,
             },
           },
           select: { id: true, title: true },
         });
 
         if (expiredBanners.length > 0) {
-          const expiredIds = expiredBanners.map((b) => b.id);
+          const expiredIds = expiredBanners.map((b: any) => b.id);
 
           // Atualiza para false
           await prisma.banner.updateMany({
@@ -40,7 +42,7 @@ export class BannerExpirationJob {
           await AuditLogService.log({
             userId: "SYSTEM_CRON", // Usuário de sistema para ações automáticas
             action: "AUTO_EXPIRE_BANNER",
-            module: "BANNER",
+            module: "BANNERS",
             details: `O sistema expirou automaticamente ${expiredBanners.length} banner(s). IDs: ${expiredIds.join(", ")}`,
             ipAddress: "127.0.0.1",
           });

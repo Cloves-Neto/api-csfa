@@ -1,5 +1,5 @@
 import cron from "node-cron";
-import PrismaSinglentonConnection from "../../../infrastructure/database/prisma/prismaSinglentonConnecion";
+import PrismaSinglentonConnection from "../../infrastructure/database/prisma/prismaSinglentonConnecion";
 
 export class AuditLogCleanupJob {
   static start() {

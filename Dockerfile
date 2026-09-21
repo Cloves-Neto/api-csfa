@@ -1,5 +1,4 @@
-# Usar a imagem oficial do Node.js baseada no Alpine Linux (leve e segura)
-FROM node:20-alpine
+FROM node:22-alpine
 
 # Define o diretório de trabalho dentro do container
 WORKDIR /app
